@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tajurba — AutoML that shows its work</title>
+<meta name="description" content="Upload a CSV, train four model families, and read a leaderboard where every score sits next to a baseline." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+
+<!-- ── Auth screen ─────────────────────────────────────────────── -->
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-panel">
+    <div class="auth-brand">
+      <div class="mark">تجربہ</div>
+      <h1>Tajurba</h1>
+      <p class="tagline">AutoML that shows its work.</p>
+      <ul class="auth-points">
+        <li><span>01</span> Four model families, written in NumPy — no black boxes.</li>
+        <li><span>02</span> Every score sits next to a baseline you can beat.</li>
+        <li><span>03</span> The encoder is saved, so predictions are reproducible.</li>
+      </ul>
+    </div>
+    <div class="auth-form-wrap">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="login" role="tab">Sign in</button>
+        <button class="tab" data-tab="register" role="tab">Create account</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <label>Email<input type="email" name="email" required autocomplete="email" placeholder="you@example.com" /></label>
+        <label>Password<input type="password" name="password" required autocomplete="current-password" placeholder="••••••••" /></label>
+        <button type="submit" class="btn primary">Sign in</button>
+        <p class="hint">Demo account: <code>demo@tajurba.pk</code> / <code>tajurba-demo-2026</code></p>
+      </form>
+
+      <form id="register-form" class="auth-form hidden">
+        <label>Name<input type="text" name="name" required autocomplete="name" placeholder="Your name" /></label>
+        <label>Email<input type="email" name="email" required autocomplete="email" placeholder="you@example.com" /></label>
+        <label>Password<input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters" /></label>
+        <button type="submit" class="btn primary">Create account</button>
+      </form>
+
+      <p id="auth-error" class="error hidden"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── App shell ───────────────────────────────────────────────── -->
+<div id="app" class="app hidden">
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark small">تجربہ</span>
+      <span class="brand-name">Tajurba</span>
+    </div>
+    <nav class="nav">
+      <button class="nav-btn active" data-view="datasets">Datasets</button>
+      <button class="nav-btn" data-view="runs">Runs</button>
+    </nav>
+    <div class="user">
+      <span id="user-name" class="user-name"></span>
+      <button id="logout" class="btn ghost small">Sign out</button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- Datasets view -->
+    <section id="view-datasets" class="view">
+      <div class="view-head">
+        <div>
+          <h2>Datasets</h2>
+          <p class="sub">Upload a CSV, or start from one of the three bundled sets.</p>
+        </div>
+        <label class="btn primary file-btn">
+          Upload CSV
+          <input type="file" id="file-input" accept=".csv" hidden />
+        </label>
+      </div>
+
+      <div id="samples" class="samples"></div>
+      <div id="dataset-list" class="card-grid"></div>
+      <p id="datasets-empty" class="empty hidden">No datasets yet. Upload a CSV or load a sample above.</p>
+    </section>
+
+    <!-- Runs view -->
+    <section id="view-runs" class="view hidden">
+      <div class="view-head">
+        <div>
+          <h2>Runs</h2>
+          <p class="sub">Every search you've run, newest first.</p>
+        </div>
+      </div>
+      <div id="run-list" class="card-grid"></div>
+      <p id="runs-empty" class="empty hidden">No runs yet. Open a dataset and train a model.</p>
+    </section>
+
+    <!-- Dataset detail -->
+    <section id="view-dataset" class="view hidden">
+      <button class="back" data-back="datasets">← All datasets</button>
+      <div class="view-head">
+        <div>
+          <h2 id="ds-title"></h2>
+          <p class="sub" id="ds-meta"></p>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <h3>Preview</h3>
+          <div class="table-scroll"><table id="ds-preview" class="data-table"></table></div>
+        </div>
+
+        <div class="panel">
+          <h3>Train</h3>
+          <form id="train-form" class="train-form">
+            <label>Target column
+              <select name="target" id="target-select" required></select>
+            </label>
+            <label>Task
+              <select name="task" id="task-select" required>
+                <option value="classification">Classification</option>
+                <option value="regression">Regression</option>
+              </select>
+            </label>
+            <label>Test split
+              <select name="test_fraction">
+                <option value="0.2">20%</option>
+                <option value="0.25" selected>25%</option>
+                <option value="0.3">30%</option>
+              </select>
+            </label>
+            <button type="submit" class="btn primary" id="train-btn">Run AutoML</button>
+            <p class="hint">Trains 6–8 candidates and scores each on a held-out split.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- Run detail -->
+    <section id="view-run" class="view hidden">
+      <button class="back" data-back="runs">← All runs</button>
+      <div class="view-head">
+        <div>
+          <h2 id="run-title"></h2>
+          <p class="sub" id="run-meta"></p>
+        </div>
+      </div>
+
+      <div id="run-notes" class="notes"></div>
+
+      <div class="stat-row" id="run-stats"></div>
+
+      <div class="panel">
+        <h3>Leaderboard</h3>
+        <p class="panel-sub">Scored on the held-out split. The baseline row is what you have to beat.</p>
+        <div class="table-scroll"><table id="leaderboard" class="data-table"></table></div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <h3>Try a prediction</h3>
+          <p class="panel-sub">Fill in the source columns and score one row.</p>
+          <form id="predict-form" class="predict-form"></form>
+          <div id="predict-result" class="predict-result hidden"></div>
+        </div>
+        <div class="panel">
+          <h3>What was encoded</h3>
+          <p class="panel-sub">The feature matrix the models actually saw.</p>
+          <div id="feature-list" class="feature-list"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
